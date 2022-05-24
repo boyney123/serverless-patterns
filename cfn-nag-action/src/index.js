@@ -3,6 +3,9 @@ const filesToCheck = ['template.yml', 'template.yaml'];
 
 const args = process.argv.slice(2);
 
+console.log('HERE ARE SOME ARGS');
+console.log(args);
+
 const newFiles = args[0].split(',');
 const modifiedFiles = args[1].split(',');
 
