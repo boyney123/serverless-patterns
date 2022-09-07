@@ -7,12 +7,22 @@ module.exports = async ({ github, context, core }) => {
 
   try {
     const {
-      data: { head, base },
+      data: { head, base, ...rest },
     } = await github.rest.pulls.get({
       owner: context.repo.owner,
       repo: context.repo.repo,
       pull_number: prNumber,
     });
+
+    const { data: fileData } = await github.rest.pulls.listFiles({
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      pull_number: prNumber
+    })
+
+    const allChangedFiles = fileData.map(file => file.filename);
+
+    core.setOutput('files', allChangedFiles.toString());
 
     core.setOutput('headRef', head.ref);
     core.setOutput('headSHA', head.sha);

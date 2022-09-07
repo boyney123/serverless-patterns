@@ -7,6 +7,7 @@ const v = new Validator();
 const schema = require('./pattern-schema.json');
 
 const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
+const includeGitHubChanges = process.env.GH_AUTOMATION ? process.env.GH_AUTOMATION === 'true' : true;
 
 const octokit = new Octokit({
   auth: process.env.TOKEN,
@@ -23,8 +24,6 @@ const buildErrors = (validationErrors) => {
   });
 };
 
-console.log(process.env);
-
 const addedFiles = process.env.ADDED_FILES ? process.env.ADDED_FILES.split(',') : [];
 const modifiedFiles = process.env.MODIFIED_FILES ? process.env.MODIFIED_FILES.split(',') : [];
 
@@ -34,7 +33,7 @@ const pathToExamplePattern = findFile([...addedFiles, ...modifiedFiles], 'exampl
 
 const main = async () => {
   if (!pathToExamplePattern) {
-    console.log('No example-pattern.json found, skipping any validation phase.');
+    console.info('No example-pattern.json found, skipping any validation phase.');
     process.exit(0);
   }
 
@@ -49,43 +48,34 @@ const main = async () => {
 
     if (result.errors.length > 0) {
       const errors = buildErrors(result.errors);
-      console.log(errors);
 
       const errorList = errors.map((error, index) => `${index + 1}. \`${error.path}\`: ${error.stack}\n\n`);
 
-      // Write comment back with errors for
-      await octokit.rest.issues.createComment({
-        owner,
-        repo,
-        issue_number: process.env.PR_NUMBER,
-        body:
-          `@${process.env.GITHUB_ACTOR} your 'example-pattern.json' is missing some key fields, please review below and address any errors you have \n\n` +
-          `${errorList.toString().replace(/,/g, '')} \n\n` +
-          `_If you need any help, take a look at the [example-pattern file](https://github.com/aws-samples/serverless-patterns/blob/main/_pattern-model/example-pattern.json)._ \n\n` +
-          `Make the changes, and push your changes back to this pull request. When all automated checks are successful, the Serverless DA team will process your pull request. \n\n`,
-      });
+      if (includeGitHubChanges) {
+        // Write comment back with errors for
+        await octokit.rest.issues.createComment({
+          owner,
+          repo,
+          issue_number: process.env.PR_NUMBER,
+          body:
+            `@${process.env.GITHUB_ACTOR} your 'example-pattern.json' is missing some key fields, please review below and address any errors you have \n\n` +
+            `${errorList.toString().replace(/,/g, '')} \n\n` +
+            `_If you need any help, take a look at the [example-pattern file](https://github.com/aws-samples/serverless-patterns/blob/main/_pattern-model/example-pattern.json)._ \n\n` +
+            `Make the changes, and push your changes back to this pull request. When all automated checks are successful, the Serverless DA team will process your pull request. \n\n`,
+        });
+      }
 
-      await octokit.rest.issues.addLabels({
-        owner,
-        repo,
-        issue_number: process.env.PR_NUMBER,
-        labels: ['changes-required'],
-      });
+      console.info('includeGitHubChanges', includeGitHubChanges)
 
-      throw new Error('Failed to validate pattern, errors found');
+      if (!includeGitHubChanges) {
+        throw new Error('Failed to validate pattern, errors found');
+      }
+      console.info('Added comments back to the pull request requesting changes');
     }
 
-    // Everything OK, remove this label
-    await octokit.rest.issues.removeLabel({
-      owner,
-      repo,
-      issue_number: process.env.PR_NUMBER,
-      name: 'changes-required',
-    });
-
-    // Everything OK....
+    console.info('Everything OK with pattern');
   } catch (error) {
-    console.log(error);
+    console.info(error);
     throw Error('Failed to process the example-pattern.json file.');
   }
 };
