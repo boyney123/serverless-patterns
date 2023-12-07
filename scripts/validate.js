@@ -71,8 +71,22 @@ const main = async () => {
       console.info('Errors found: Added comments back to the pull request requesting changes');
     } else {
       console.info('Everything OK with pattern');
-    }
 
+      if (includeGitHubChanges) {
+
+        console.log('DATA', process.env)
+        console.log('DATA', process.ENV)
+
+        await octokit.rest.issues.createComment({
+          owner,
+          repo,
+          issue_number: process.env.PR_NUMBER,
+          body:
+            `Valid pattern file found. \n\n` +
+            `Reviewer you can view the pattern file here: https://beta.serverlessland.com/patterns/pattern-example?repo=XXX&pattern=${JSON.stringify(parsedJSON)} \n\n`
+        });
+      }
+    }
   } catch (error) {
     console.info(error);
     throw Error('Failed to process the example-pattern.json file.');
